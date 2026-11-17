@@ -29,3 +29,4 @@ Thumbs.db
 .vite/
 .turbo/
 .cache/
+*.bundle
