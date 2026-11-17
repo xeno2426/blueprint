@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 
-const child = spawn('node', ['/workspaces/blueprint/mcp-server/index.js']);
+const child = spawn('node', [new URL('./index.js', import.meta.url).pathname]);
 
 let buffer = '';
 

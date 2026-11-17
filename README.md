@@ -99,6 +99,36 @@ blueprint/
 
 ---
 
+## 🔐 Bridge security (changed)
+
+`node mcp-server/bridge.js` (or `npm run bridge`) now:
+
+* listens on `127.0.0.1` only (override with `BRIDGE_HOST`),
+* prints a random token at start (or use `BRIDGE_TOKEN`); every POST except `/api/generate` needs it in the `x-bridge-token` header,
+* keeps shell commands (`run:`, `$`) **disabled** unless you start it with `BRIDGE_ALLOW_EXEC=1` and send the token,
+* only accepts `localhost` hosts and origins (plus `*.app.github.dev` when running inside a Codespace),
+* refuses file paths that escape the project folder.
+
+Do not make port 4000 public in a Codespace.
+
+## 🤖 Real AI generation (new)
+
+Without a key the app uses a fixed offline template (plus a butterfly/ornithopter preset). To get real generation and free-form edits:
+
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...      # optional: BLUEPRINT_MODEL=claude-sonnet-5-5
+npm run bridge                           # terminal 1
+npm run dev                              # terminal 2 (Vite proxies /api to the bridge)
+```
+
+The model reply is validated (unknown nodes, missing pins, duplicate ids) and retried once before it is accepted. Totals for cost and mass are recomputed in code, not taken from the model.
+
+## 💾 Saved projects
+
+Generated and edited projects are stored in the browser (localStorage) and appear first in Community. Edited sample projects are saved as copies.
+
+---
+
 ## 📄 License
 
 MIT License. Designed and engineered with Antigravity.

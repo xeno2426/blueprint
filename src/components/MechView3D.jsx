@@ -294,10 +294,10 @@ export default function MechView3D({ project, onPartClick }) {
       <div className="absolute top-4 left-4 z-10 flex items-center gap-3 bg-[#131313]/90 border border-[#272828] rounded-md px-3.5 py-2 backdrop-blur-md">
         <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
         <span className="font-tech text-xs tracking-wider uppercase text-gray-300">
-          MechView Engine • ForgeCAD 3D
+          Reference model (generic)
         </span>
         <span className="text-[10px] font-mono text-gray-500 bg-[#1c1c1c] px-2 py-0.5 rounded border border-[#333]">
-          {project?.nodes?.length || 8} Parts Loaded
+          {project?.nodes?.length || 0} parts in BOM
         </span>
       </div>
 

@@ -1,39 +1,42 @@
 {
-  "id": "proj-bionic-smart-prosthetic-hand-fl6o",
-  "projectName": "Bionic Smart Prosthetic Hand",
-  "description": "5-finger EMG-controlled robotic bionic hand with tactile pressure feedback and servo tensioning",
+  "id": "proj-autonomous-delivery-drone-ayj0",
+  "projectName": "Autonomous Delivery Drone",
+  "description": "Heavy-lift delivery quadcopter with GPS telemetry, collision avoidance lidar, and automated payload drop mechanism.",
   "category": "Robotics",
   "stars": 1,
   "author": "Antigravity Engineer",
   "authorAvatar": "AN",
-  "created_at": "2026-11-17T07:56:50.304Z",
+  "created_at": "2026-11-17T08:49:13.549Z",
   "thumbnail": "/landing/images/hero-dog.webp",
   "renderImage": "/landing/images/hero-dog.webp",
-  "estimatedCost": 66.15,
+  "estimatedCost": 89.65,
   "buildTime": "4-6 hours",
   "difficulty": "Advanced",
   "specs": {
-    "mcu": "ESP32-S3 Dual-Core MCU",
-    "power": "3.7V 2500mAh LiPo Battery",
+    "mcu": "STM32F405 Flight Controller",
+    "power": "14.8V 4S 1500mAh LiPo Battery",
     "connectivity": "WiFi 802.11 b/g/n, BLE 5.0",
     "sensors": "Environmental Telemetry, High-Accuracy ADC",
-    "weight": "220 g",
     "dimensions": "120 x 80 x 35 mm"
   },
   "nodes": [
     {
       "id": "node-core-mcu",
-      "name": "ESP32-S3 Dual-Core MCU",
-      "productName": "ESP32-S3-WROOM-1",
+      "name": "STM32F405 Flight Controller",
+      "productName": "STM32F405-FC-V3",
       "category": "electrical",
       "type": "microcontroller",
       "vendor": "DigiKey",
-      "vendor_sku": "ESP32-S3-WROOM-1-ND",
-      "price": 8.5,
+      "vendor_sku": "",
+      "price": 32,
       "quantity": 1,
-      "inStock": true,
-      "stockCount": 1850,
+      "priceEstimate": true,
       "pins": [
+        {
+          "name": "VIN",
+          "type": "power",
+          "signal": "V_BATT"
+        },
         {
           "name": "3V3",
           "type": "power",
@@ -84,16 +87,15 @@
     },
     {
       "id": "node-power-unit",
-      "name": "3.7V 2500mAh LiPo Battery",
+      "name": "14.8V 4S 1500mAh LiPo Battery",
       "productName": "High-Density Energy Storage Unit",
       "category": "electrical",
       "type": "battery",
       "vendor": "Adafruit",
-      "vendor_sku": "AF-BAT-2500",
+      "vendor_sku": "",
       "price": 14.5,
       "quantity": 1,
-      "inStock": true,
-      "stockCount": 420,
+      "priceEstimate": true,
       "pins": [
         {
           "name": "V+",
@@ -120,11 +122,10 @@
       "category": "electrical",
       "type": "sensor",
       "vendor": "SparkFun",
-      "vendor_sku": "SEN-19096",
+      "vendor_sku": "",
       "price": 19.95,
       "quantity": 1,
-      "inStock": true,
-      "stockCount": 560,
+      "priceEstimate": true,
       "pins": [
         {
           "name": "VCC",
@@ -161,11 +162,10 @@
       "category": "electrical",
       "type": "display",
       "vendor": "Waveshare",
-      "vendor_sku": "WS-154-SPI",
+      "vendor_sku": "",
       "price": 11.2,
       "quantity": 1,
-      "inStock": true,
-      "stockCount": 890,
+      "priceEstimate": true,
       "pins": [
         {
           "name": "VCC",
@@ -207,7 +207,7 @@
       "category": "3d_printed",
       "type": "enclosure",
       "vendor": "Custom 3D Print / ForgeCAD",
-      "vendor_sku": "CAD-GEN-ENCL-01",
+      "vendor_sku": "",
       "price": 12,
       "quantity": 1,
       "material": "PETG / Tough Resin",
@@ -216,8 +216,7 @@
         "infill": 30,
         "support": false
       },
-      "inStock": true,
-      "stockCount": 999,
+      "priceEstimate": true,
       "dimensions": {
         "width": 120,
         "height": 80,
@@ -231,9 +230,9 @@
       "fromNode": "node-power-unit",
       "fromPin": "V+",
       "toNode": "node-core-mcu",
-      "toPin": "3V3",
+      "toPin": "VIN",
       "color": "#ef4444",
-      "label": "Power Rail"
+      "label": "Battery to VIN (check your board's input voltage range)"
     },
     {
       "id": "gen-w2",

@@ -1,8 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { generateProjectFromPrompt } from '../src/data/projectGenerator.js';
 
-const WORKSPACE_ROOT = process.env.WORKSPACE_ROOT || '/workspaces/blueprint';
+const WORKSPACE_ROOT = path.resolve(process.env.WORKSPACE_ROOT || path.join(path.dirname(fileURLToPath(import.meta.url)), '..'));
 
 /**
  * Creates a new hardware project, generates all architecture artifacts,

@@ -2,41 +2,39 @@ import React, { useEffect, useState } from 'react';
 import { Sparkles, Cpu, Zap, Box, Wrench, CheckCircle } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
-export default function GenerationModal({ prompt, onComplete }) {
+export default function GenerationModal({ prompt, promise, onComplete }) {
   const steps = [
-    { id: 1, label: "Admitting prompt into AI planning queue…", icon: Sparkles },
-    { id: 2, label: "Synthesizing MCU architecture & power budget…", icon: Cpu },
-    { id: 3, label: "Matching components across DigiKey, Mouser & Adafruit…", icon: Zap },
-    { id: 4, label: "Generating pin-to-pin wiring netlist & power rails…", icon: Zap },
-    { id: 5, label: "Parametric 3D CAD modeling & enclosure synthesis…", icon: Box },
-    { id: 6, label: "Compiling physical build manual & assembly steps…", icon: Wrench }
+    { id: 1, label: "Reading your idea…", icon: Sparkles },
+    { id: 2, label: "Choosing the microcontroller and power…", icon: Cpu },
+    { id: 3, label: "Listing parts, mass and cost estimates…", icon: Zap },
+    { id: 4, label: "Wiring pins and checking pin names…", icon: Zap },
+    { id: 5, label: "Sizing parts and mechanical joints…", icon: Box },
+    { id: 6, label: "Writing the build steps…", icon: Wrench }
   ];
 
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
 
   useEffect(() => {
+    let cancelled = false;
+    const startedAt = Date.now();
+    // Advance the steps while we wait, but never past the last one until the real result is in.
     const timer = setInterval(() => {
-      setCurrentStepIndex(prev => {
-        if (prev < steps.length - 1) {
-          return prev + 1;
-        } else {
-          clearInterval(timer);
-          try {
-            confetti({
-              particleCount: 75,
-              spread: 70,
-              origin: { y: 0.6 }
-            });
-          } catch {}
-          setTimeout(() => {
-            onComplete();
-          }, 600);
-          return prev;
-        }
-      });
-    }, 600);
+      setCurrentStepIndex(prev => (prev < steps.length - 1 ? prev + 1 : prev));
+    }, 700);
 
-    return () => clearInterval(timer);
+    Promise.resolve(promise).then(async (result) => {
+      const minShown = 2500; // keep the progress readable even when the template answers instantly
+      await new Promise(r => setTimeout(r, Math.max(0, minShown - (Date.now() - startedAt))));
+      if (cancelled) return;
+      clearInterval(timer);
+      setCurrentStepIndex(steps.length);
+      try {
+        confetti({ particleCount: 75, spread: 70, origin: { y: 0.6 } });
+      } catch {}
+      setTimeout(() => { if (!cancelled) onComplete(result); }, 500);
+    });
+
+    return () => { cancelled = true; clearInterval(timer); };
   }, []);
 
   return (
@@ -87,7 +85,7 @@ export default function GenerationModal({ prompt, onComplete }) {
 
         {/* Bottom Status */}
         <div className="pt-2 text-center text-[11px] font-mono text-gray-500">
-          Blueprint Labs Multimodal CAD Pipeline v2.0
+          Working… AI is used when the bridge has an API key, otherwise an offline template
         </div>
       </div>
     </div>

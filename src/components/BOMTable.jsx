@@ -58,6 +58,11 @@ export default function BOMTable({ project, onPartClick }) {
 
   return (
     <div className="w-full h-full flex flex-col bg-[#0e0e10] overflow-hidden">
+      {project?.nodes?.some(n => n.priceEstimate) && (
+        <div className="shrink-0 px-4 py-1.5 text-[11px] font-mono text-amber-300 bg-amber-950/30 border-b border-amber-900/40">
+          Prices are rough estimates and part numbers are not verified. Check each supplier before buying.
+        </div>
+      )}
       {/* Top Controls Bar */}
       <div className="shrink-0 border-b border-[#24262b] bg-[#121316] p-4 flex flex-wrap items-center justify-between gap-4">
         {/* Search & Category Filter */}
@@ -241,7 +246,7 @@ export default function BOMTable({ project, onPartClick }) {
               <div className="bg-[#1b1c21] p-3 rounded-lg border border-[#282a32]">
                 <div className="text-gray-500 text-[10px] uppercase">Unit Pricing</div>
                 <div className="text-emerald-400 font-bold mt-1">${(selectedPartModal.price || 0).toFixed(2)}</div>
-                <div className="text-gray-500 text-[10px]">{selectedPartModal.stockCount || 500} units in stock</div>
+                <div className="text-gray-500 text-[10px]">{selectedPartModal.stockCount ? `${selectedPartModal.stockCount} units in stock` : 'Check supplier for stock'}</div>
               </div>
             </div>
 

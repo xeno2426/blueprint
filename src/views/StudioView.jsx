@@ -22,7 +22,10 @@ import {
   ExternalLink,
   Plus
 } from 'lucide-react';
-import confetti from 'canvas-confetti';
+import { SAMPLE_PROJECTS } from '../data/sampleProjects';
+import { buildPlan } from '../data/planPatches';
+import { requestAiProject } from '../data/aiClient';
+import { saveProject } from '../data/storage';
 
 import RenderHeroView from '../components/RenderHeroView';
 import BOMTable from '../components/BOMTable';
@@ -30,15 +33,17 @@ import WiringCanvas from '../components/WiringCanvas';
 import MechView3D from '../components/MechView3D';
 import InstructionsView from '../components/InstructionsView';
 
-export default function StudioView({ project: initialProject, onBackToDashboard }) {
+export default function StudioView({ project: initialProject, generationNote, onBackToDashboard }) {
   const [project, setProject] = useState(initialProject);
   const [activeTab, setActiveTab] = useState('render');
-  const [isChatCollapsed, setIsChatCollapsed] = useState(false);
+  const [isChatCollapsed, setIsChatCollapsed] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth < 768
+  );
   const [chatMessages, setChatMessages] = useState([
     {
       id: 1,
       sender: 'assistant',
-      text: `Welcome to Blueprint Studio! I've synthesized the hardware architecture for **${initialProject?.projectName}**.\n\nYou can inspect the 3D CAD enclosure in MECH, review all distributor pricing in PARTS, inspect the circuit pins in WIRING, and follow the assembly manual in INSTRUCTIONS.\n\nWhat would you like to refine?`
+      text: `Welcome to Blueprint Studio! Here is the hardware architecture for **${initialProject?.projectName}**.\n\nYou can inspect the 3D CAD enclosure in MECH, review all distributor pricing in PARTS, inspect the circuit pins in WIRING, and follow the assembly manual in INSTRUCTIONS.\n\nWhat would you like to refine?${generationNote ? `\n\nNote: ${generationNote}` : ''}`
     }
   ]);
   const [promptInput, setPromptInput] = useState('');
@@ -57,17 +62,6 @@ export default function StudioView({ project: initialProject, onBackToDashboard 
 
   const [pendingPlan, setPendingPlan] = useState(null);
 
-  // Trigger celebration confetti on initial mount
-  useEffect(() => {
-    try {
-      confetti({
-        particleCount: 50,
-        spread: 60,
-        origin: { y: 0.7 }
-      });
-    } catch {}
-  }, []);
-
   // Update project name
   const handleSaveTitle = () => {
     if (!titleDraft.trim()) return;
@@ -78,73 +72,74 @@ export default function StudioView({ project: initialProject, onBackToDashboard 
 
   const triggerAutoSave = () => {
     setSaveStatus('Saving…');
-    setTimeout(() => {
-      setSaveStatus('Saved');
-    }, 600);
+    setTimeout(() => setSaveStatus(st => (st === 'Saving…' ? 'Saved' : st)), 600);
   };
 
-  // Handle sending an AI refinement request
-  const handleSendMessage = (textToSend) => {
+  // Persist every change to this browser. Built-in sample projects are saved as a copy.
+  useEffect(() => {
+    if (project === initialProject) return;
+    const isSample = SAMPLE_PROJECTS.some(p => p.id === project.id);
+    const ok = saveProject(isSample ? { ...project, id: 'my-' + project.id } : project);
+    setSaveStatus(ok ? 'Saved' : 'Not saved (browser storage blocked)');
+  }, [project]);
+
+  // Ask for a change. Uses the AI backend when it is available, otherwise the offline planner.
+  const handleSendMessage = async (textToSend) => {
     const text = textToSend || promptInput;
     if (!text.trim() || isAiGenerating) return;
 
-    const userMsg = { id: Date.now(), sender: 'user', text };
-    setChatMessages(prev => [...prev, userMsg]);
+    setChatMessages(prev => [...prev, { id: Date.now(), sender: 'user', text }]);
     setPromptInput('');
+    setPendingPlan(null);
     setIsAiGenerating(true);
 
-    // Simulate AI reasoning and producing an edit plan
-    setTimeout(() => {
-      let planDescription = "";
-      if (text.toLowerCase().includes("battery") || text.toLowerCase().includes("power")) {
-        planDescription = "Upgrading power delivery to a high-capacity 3.7V 3500mAh 18650 cell with integrated TP4056 USB-C charging circuit.";
-      } else if (text.toLowerCase().includes("buzzer") || text.toLowerCase().includes("audio") || text.toLowerCase().includes("sound")) {
-        planDescription = "Adding a 5V Active Piezo Buzzer on GPIO12 with PWM pitch control for audible alarm notifications.";
-      } else if (text.toLowerCase().includes("sensor") || text.toLowerCase().includes("detect")) {
-        planDescription = "Adding an ambient light & UV optical sensor (LTR-390) over I2C bus.";
-      } else {
-        planDescription = `Optimized component layout and bill of materials based on: "${text}". Added bypass filtering capacitors on the power rails.`;
-      }
-
+    let reply = '';
+    const ai = await requestAiProject(text, project);
+    if (ai.project) {
       setPendingPlan({
-        summary: planDescription,
-        applied: false
+        summary: `AI edit: ${text}`,
+        changes: [`${ai.project.nodes.length} parts, ${ai.project.electricalConnections.length} wires, est. $${ai.project.estimatedCost}`],
+        next: ai.project
       });
+      reply = 'The AI prepared an updated version. Review it below, then apply or discard.';
+    } else {
+      const plan = buildPlan(text, project);
+      if (plan.changes.length) {
+        setPendingPlan(plan);
+        reply = 'I prepared a change using the offline planner. Review it below, then apply or discard.';
+      } else {
+        reply = plan.summary;
+      }
+    }
 
-      setChatMessages(prev => [
-        ...prev,
-        {
-          id: Date.now() + 1,
-          sender: 'assistant',
-          text: `I've analyzed your request: "${text}".\n\nI have prepared an updated hardware modification plan for your review. Check the plan below to approve or discard changes.`
-        }
-      ]);
-
-      setIsAiGenerating(false);
-    }, 1500);
+    setChatMessages(prev => [...prev, { id: Date.now() + 1, sender: 'assistant', text: reply }]);
+    setIsAiGenerating(false);
   };
 
-  // Apply the pending AI modification plan
+  // Apply the pending plan: checkpoint the current version first, then swap in the new one.
   const handleApplyPlan = () => {
     if (!pendingPlan) return;
-
-    triggerAutoSave();
-    const newVersionId = `v${versionHistory.length + 1}`;
+    const previous = project;
     setVersionHistory(prev => [
       ...prev,
-      { id: newVersionId, name: pendingPlan.summary.slice(0, 32) + '…', timestamp: 'Just now', data: project }
+      {
+        id: `v${prev.length + 1}`,
+        name: `Before: ${pendingPlan.summary.slice(0, 40)}`,
+        timestamp: new Date().toLocaleTimeString(),
+        data: previous
+      }
     ]);
-
+    setProject(pendingPlan.next);
     setChatMessages(prev => [
       ...prev,
       {
         id: Date.now(),
         sender: 'assistant',
-        text: `Applied plan: ${pendingPlan.summary}\n\nProject BOM, schematic wiring, and 3D layout have been updated.`
+        text: `Applied: ${pendingPlan.summary}\n\n${(pendingPlan.changes || []).map(c => '• ' + c).join('\n')}\n\nUse Versions to go back.`
       }
     ]);
-
     setPendingPlan(null);
+    triggerAutoSave();
   };
 
   // Export full project JSON/ZIP
@@ -159,9 +154,9 @@ export default function StudioView({ project: initialProject, onBackToDashboard 
   };
 
   return (
-    <div className="flex flex-col w-screen h-screen bg-[#0e0f12] text-[#f8f8f7] overflow-hidden select-none">
+    <div className="flex flex-col w-full h-dvh bg-[#0e0f12] text-[#f8f8f7] overflow-hidden">
       {/* Top Main Navigation Header */}
-      <header className="h-13 bg-[#111215] border-b border-[#24262c] flex items-center justify-between px-4 shrink-0 z-30">
+      <header className="min-h-[3.25rem] bg-[#111215] border-b border-[#24262c] flex flex-wrap items-center justify-between gap-y-1 px-3 sm:px-4 py-1 shrink-0 z-30">
         {/* Left: Back + Project Name & Rename */}
         <div className="flex items-center gap-3 min-w-0 max-w-sm sm:max-w-md">
           <button
@@ -210,7 +205,7 @@ export default function StudioView({ project: initialProject, onBackToDashboard 
         </div>
 
         {/* Center: 5 Core Blueprint Workspace Tabs */}
-        <div className="flex items-center gap-1 bg-[#17181e] p-1 rounded-lg border border-[#262831]">
+        <div className="flex items-center gap-1 bg-[#17181e] p-1 rounded-lg border border-[#262831] order-last w-full md:order-none md:w-auto overflow-x-auto">
           {[
             { id: 'render', label: 'INFO', icon: Info },
             { id: 'parts', label: 'PARTS', icon: Cpu, badge: project?.nodes?.length },
@@ -224,14 +219,14 @@ export default function StudioView({ project: initialProject, onBackToDashboard 
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono font-bold uppercase tracking-wider transition-all ${
+                className={`flex flex-1 md:flex-none justify-center items-center gap-1.5 px-3 py-2 md:py-1.5 rounded-md text-xs font-mono font-bold uppercase tracking-wider transition-all ${
                   isActive
                     ? 'bg-blue-600 text-white shadow-md'
                     : 'text-gray-400 hover:text-gray-200 hover:bg-[#20222a]'
                 }`}
               >
                 <Icon size={13} />
-                <span>{tab.label}</span>
+                <span className="hidden sm:inline">{tab.label}</span>
                 {tab.badge !== undefined && (
                   <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-mono ${
                     isActive ? 'bg-white/20 text-white' : 'bg-[#262832] text-gray-400'
@@ -282,7 +277,7 @@ export default function StudioView({ project: initialProject, onBackToDashboard 
         {/* Left: Collapsible AI Conversational & Prompt Drawer */}
         <aside
           className={`shrink-0 border-r border-[#22242b] bg-[#101114] flex flex-col transition-all duration-200 z-20 ${
-            isChatCollapsed ? 'w-12' : 'w-80 md:w-96'
+            isChatCollapsed ? 'w-12' : 'w-[85vw] max-w-sm md:w-96 max-md:absolute max-md:inset-y-0 max-md:left-0 max-md:shadow-2xl'
           }`}
         >
           {/* Panel Top Toggle Header */}
@@ -337,7 +332,7 @@ export default function StudioView({ project: initialProject, onBackToDashboard 
                 {isAiGenerating && (
                   <div className="flex items-center gap-2 text-xs font-mono text-blue-400 bg-[#161820] border border-blue-900/40 p-2.5 rounded-lg animate-pulse">
                     <Sparkles size={13} className="animate-spin" />
-                    <span>Synthesizing hardware modification…</span>
+                    <span>Preparing the change…</span>
                   </div>
                 )}
 
@@ -351,6 +346,11 @@ export default function StudioView({ project: initialProject, onBackToDashboard 
                     <p className="text-xs text-gray-200 leading-normal">
                       {pendingPlan.summary}
                     </p>
+                    {pendingPlan.changes && pendingPlan.changes.length > 0 && (
+                      <ul className="text-[11px] text-gray-400 list-disc pl-4 space-y-0.5">
+                        {pendingPlan.changes.map((c, i) => <li key={i}>{c}</li>)}
+                      </ul>
+                    )}
                     <div className="flex items-center gap-2 pt-1">
                       <button
                         onClick={handleApplyPlan}
@@ -374,9 +374,9 @@ export default function StudioView({ project: initialProject, onBackToDashboard 
                 <div className="text-[10px] font-mono uppercase text-gray-500">Suggested Modifications:</div>
                 <div className="flex flex-wrap gap-1.5">
                   {[
-                    "Add active piezo buzzer for alarm",
-                    "Upgrade battery to 18650 cell",
-                    "Add IP65 waterproof seal to case"
+                    "Add an active buzzer",
+                    "Add a light sensor",
+                    "Add a status LED"
                   ].map((sug, idx) => (
                     <button
                       key={idx}

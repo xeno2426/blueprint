@@ -12,19 +12,65 @@ import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 
 const execAsync = promisify(exec);
 const PORT = process.env.BRIDGE_PORT || 4000;
-const WORKSPACE_ROOT = process.env.WORKSPACE_ROOT || '/workspaces/blueprint';
+const HOST = process.env.BRIDGE_HOST || '127.0.0.1';
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const WORKSPACE_ROOT = path.resolve(process.env.WORKSPACE_ROOT || path.join(__dirname, '..'));
 
-async function processMessage(msg) {
+// --- Security -------------------------------------------------------------
+// Shell execution is OFF unless BRIDGE_ALLOW_EXEC=1 AND the caller sends the token.
+const ALLOW_EXEC = process.env.BRIDGE_ALLOW_EXEC === '1';
+const TOKEN = process.env.BRIDGE_TOKEN || crypto.randomBytes(16).toString('hex');
+const IN_CODESPACE = !!process.env.CODESPACES;
+
+function tokenOk(req) {
+  const hdr = req.headers['x-bridge-token'] || (req.headers['authorization'] || '').replace(/^Bearer\s+/i, '');
+  const a = Buffer.from(String(hdr));
+  const b = Buffer.from(TOKEN);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+function hostAllowed(hostHeader) {
+  const host = String(hostHeader || '').replace(/:\d+$/, '').toLowerCase();
+  if (['localhost', '127.0.0.1', '[::1]'].includes(host)) return true;
+  if (host.endsWith('.trycloudflare.com')) return true;
+  return IN_CODESPACE && host.endsWith('.app.github.dev');
+}
+
+function originAllowed(origin) {
+  if (!origin) return true; // non-browser clients (curl, MCP stdio bridges)
+  try {
+    const h = new URL(origin).hostname.toLowerCase();
+    if (['localhost', '127.0.0.1', '[::1]'].includes(h)) return true;
+    if (h.endsWith('.trycloudflare.com')) return true;
+    return IN_CODESPACE && h.endsWith('.app.github.dev');
+  } catch { return false; }
+}
+
+// Resolve a user-supplied path and refuse anything outside the workspace
+// (a plain startsWith() check would also accept /workspaces/blueprint-evil).
+function safeResolve(p) {
+  const full = path.resolve(WORKSPACE_ROOT, p);
+  const rel = path.relative(WORKSPACE_ROOT, full);
+  if (rel.startsWith('..') || path.isAbsolute(rel)) throw new Error('Access outside workspace root is not permitted.');
+  return full;
+}
+
+async function processMessage(msg, authed = false) {
   let output = '';
 
   // 1. Check if it's shell execution
   if (msg.startsWith('run:') || msg.startsWith('cmd:') || msg.startsWith('exec:') || msg.startsWith('$')) {
     const cmd = msg.replace(/^(run|cmd|exec|\$):\s*/i, '');
+    if (!(ALLOW_EXEC && authed)) {
+      return 'Shell commands are disabled. Start the bridge with BRIDGE_ALLOW_EXEC=1 and send the x-bridge-token header to enable them.';
+    }
     try {
-      const { stdout, stderr } = await execAsync(cmd, { cwd: WORKSPACE_ROOT });
+      const { stdout, stderr } = await execAsync(cmd, { cwd: WORKSPACE_ROOT, timeout: 30000, maxBuffer: 5 * 1024 * 1024 });
       output = `[Command: "${cmd}"]\n\n--- Output ---\n${stdout || '(No stdout)'}\n${stderr ? `--- Stderr ---\n${stderr}` : ''}`;
     } catch (err) {
       output = `[Command Error]\n${err.message}\n${err.stdout || ''}\n${err.stderr || ''}`;
@@ -85,8 +131,8 @@ async function processMessage(msg) {
   // 4. Code / Workspace file search or inspection
   else if (msg.startsWith('read:') || msg.startsWith('cat:')) {
     const filePath = msg.replace(/^(read|cat):\s*/i, '').trim();
-    const fullPath = path.resolve(WORKSPACE_ROOT, filePath);
     try {
+      const fullPath = safeResolve(filePath);
       if (fs.existsSync(fullPath)) {
         const content = fs.readFileSync(fullPath, 'utf8');
         output = `[File: ${filePath}]\n\n${content}`;
@@ -110,19 +156,36 @@ async function processMessage(msg) {
   return output;
 }
 
+let lastGenerateAt = 0;
+
 const server = http.createServer(async (req, res) => {
-  // Enable CORS
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, HEAD');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  // Reject DNS-rebinding style requests and foreign browser origins.
+  if (!hostAllowed(req.headers.host)) {
+    res.writeHead(403); res.end('Forbidden host'); return;
+  }
+  const origin = req.headers.origin;
+  if (origin) {
+    if (!originAllowed(origin)) { res.writeHead(403); res.end('Forbidden origin'); return; }
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, HEAD');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Bridge-Token');
+  }
 
   if (req.method === 'OPTIONS') {
-    res.writeHead(200);
+    res.writeHead(204);
     res.end();
     return;
   }
 
   const urlPath = req.url ? req.url.split('?')[0] : '/';
+  const authed = tokenOk(req);
+  // Every POST except the public generator endpoint needs the token.
+  if (req.method === 'POST' && urlPath !== '/api/generate' && !authed) {
+    res.writeHead(401, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: 'error', error: 'Missing or invalid x-bridge-token.' }));
+    return;
+  }
 
   // 1. Interactive Web Dashboard UI
   if ((req.method === 'GET' || req.method === 'HEAD') && (urlPath === '/' || urlPath === '/index.html' || urlPath === '')) {
@@ -203,9 +266,11 @@ const server = http.createServer(async (req, res) => {
       output.innerText = 'Working on task in /workspaces/blueprint...';
 
       try {
+        let tok = sessionStorage.getItem('bridgeToken') || prompt('Bridge token (printed in the terminal where the bridge started):') || '';
+        sessionStorage.setItem('bridgeToken', tok);
         const res = await fetch('/message', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'x-bridge-token': tok },
           body: JSON.stringify({ message: msg })
         });
         const data = await res.json();
@@ -231,7 +296,7 @@ const server = http.createServer(async (req, res) => {
       try {
         const parsed = JSON.parse(body || '{}');
         const message = parsed.message || parsed.prompt || parsed.task || '';
-        const output = await processMessage(message);
+        const output = await processMessage(message, authed);
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
@@ -374,7 +439,7 @@ const server = http.createServer(async (req, res) => {
             textResult = `Created Project "${resData.project.projectName}" (${resData.project.id}) at ${resData.paths.directory}`;
           } else {
             const msg = toolArgs.message || toolArgs.prompt || '';
-            textResult = await processMessage(msg);
+            textResult = await processMessage(msg, authed);
           }
 
           res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -398,6 +463,49 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // 3b. AI generation endpoint used by the web app. The API key never leaves this server.
+  if (req.method === 'POST' && urlPath === '/api/generate') {
+    if (!/^application\/json/i.test(req.headers['content-type'] || '')) {
+      res.writeHead(415, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ status: 'error', error: 'Content-Type must be application/json' }));
+      return;
+    }
+    const now = Date.now();
+    if (now - lastGenerateAt < 3000) {
+      res.writeHead(429, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ status: 'error', error: 'Slow down: one generation every 3 seconds.' }));
+      return;
+    }
+    lastGenerateAt = now;
+    let body = '';
+    let tooBig = false;
+    req.on('data', chunk => {
+      body += chunk;
+      if (body.length > 300000) { tooBig = true; req.destroy(); }
+    });
+    req.on('end', async () => {
+      if (tooBig) return;
+      try {
+        const parsed = JSON.parse(body || '{}');
+        const prompt = String(parsed.prompt || '').trim().slice(0, 2000);
+        if (!prompt) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ status: 'error', error: 'prompt is required' }));
+          return;
+        }
+        const { generateWithAI } = await import('./aiGenerate.js');
+        const project = await generateWithAI({ prompt, project: parsed.project });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ status: 'success', project }));
+      } catch (err) {
+        const code = err.code === 'no_key' ? 503 : 502;
+        res.writeHead(code, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ status: 'error', code: err.code || 'generation_failed', error: err.message }));
+      }
+    });
+    return;
+  }
+
   // 5. Status / Health Endpoint
   if (req.method === 'GET' && (urlPath === '/status' || urlPath === '/health')) {
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -405,6 +513,8 @@ const server = http.createServer(async (req, res) => {
       status: 'healthy',
       service: 'blueprint-antigravity-bridge',
       workspace: WORKSPACE_ROOT,
+      ai: !!process.env.ANTHROPIC_API_KEY,
+      shellEnabled: ALLOW_EXEC,
       tools: ['send_message', 'create_project', 'generate_hardware_project', 'execute_command', 'read_workspace_file', 'write_workspace_file', 'list_workspace_files'],
       time: new Date().toISOString()
     }));
@@ -415,6 +525,8 @@ const server = http.createServer(async (req, res) => {
   res.end('Not found');
 });
 
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`[Bridge] Blueprint Antigravity MCP Bridge listening on http://0.0.0.0:${PORT}`);
+server.listen(PORT, HOST, () => {
+  console.log(`[Bridge] Listening on http://${HOST}:${PORT}`);
+  console.log(`[Bridge] Token: ${TOKEN}${process.env.BRIDGE_TOKEN ? ' (from BRIDGE_TOKEN)' : ' (random for this run; set BRIDGE_TOKEN to keep it)'}`);
+  console.log(`[Bridge] Shell commands: ${ALLOW_EXEC ? 'ENABLED (token required)' : 'disabled'}`);
 });

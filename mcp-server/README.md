@@ -1,6 +1,6 @@
 # Blueprint Antigravity MCP Server & Message Bridge
 
-An official **Model Context Protocol (MCP)** server and HTTP/SSE message bridge for `/workspaces/blueprint`.
+An official **Model Context Protocol (MCP)** server and HTTP/SSE message bridge for the project folder (set `WORKSPACE_ROOT` to override).
 
 It enables any external client (Claude Desktop, Cursor, Continue, Windsurf, or custom webhooks/scripts) to **send messages, commands, or prompts**, which are **received and executed in the workspace**, and the **output is returned back**.
 
@@ -11,9 +11,9 @@ It enables any external client (Claude Desktop, Cursor, Continue, Windsurf, or c
 | Tool Name | Parameters | Description |
 | :--- | :--- | :--- |
 | **`send_message`** | `message` (string), `context` (string) | Primary tool. Processes messages, runs tasks, executes shell commands (`cmd: <command>`), generates hardware architectures (`generate <idea>`), or inspects files (`cat: <file>`). Returns complete output. |
-| **`execute_command`** | `command` (string), `cwd` (string) | Executes bash commands inside `/workspaces/blueprint` and returns stdout, stderr, and exit code. |
-| **`read_workspace_file`** | `path` (string) | Reads file contents from `/workspaces/blueprint`. |
-| **`write_workspace_file`** | `path` (string), `content` (string) | Writes or updates files in `/workspaces/blueprint`. |
+| **`execute_command`** | `command` (string), `cwd` (string) | Executes bash commands inside the project folder (set `WORKSPACE_ROOT` to override) and returns stdout, stderr, and exit code. |
+| **`read_workspace_file`** | `path` (string) | Reads file contents from the project folder (set `WORKSPACE_ROOT` to override). |
+| **`write_workspace_file`** | `path` (string), `content` (string) | Writes or updates files in the project folder (set `WORKSPACE_ROOT` to override). |
 | **`list_workspace_files`** | `directory` (string) | Lists workspace files and directories. |
 | **`generate_hardware_project`** | `prompt` (string) | Synthesizes a full hardware project (BOM, wiring netlists, 3D CAD dimensions, and assembly manual) and saves it to the workspace. |
 | **`create_project`** | `name` (string), `description` (string), `category` (string), `difficulty` (string), `specs` (object), `components` (array), `instructions` (array), `addToShowcase` (boolean) | Creates a complete, permanent hardware project with dedicated directory under `projects/<slug>/`, exporting `project.json`, `bom.csv`, `wiring.json`, `assembly-guide.md`, and automatically adding it to the Web Application showcase in `src/data/sampleProjects.js`. |

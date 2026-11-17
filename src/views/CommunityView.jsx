@@ -1,9 +1,14 @@
 import React, { useState } from 'react';
 import { Search, Star, ExternalLink, Cpu, Layers, DollarSign, Filter, ArrowUpRight } from 'lucide-react';
 import { SAMPLE_PROJECTS } from '../data/sampleProjects';
+import { loadProjects } from '../data/storage';
 
 export default function CommunityView({ onOpenProject, onNavigateHome }) {
-  const [projects, setProjects] = useState(SAMPLE_PROJECTS);
+  const [projects, setProjects] = useState(() => {
+    const mine = loadProjects();
+    const mineIds = new Set(mine.map(p => p.id));
+    return [...mine, ...SAMPLE_PROJECTS.filter(p => !mineIds.has(p.id))];
+  });
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
   const [starredMap, setStarredMap] = useState({});

@@ -4,9 +4,9 @@
     "fromNode": "node-power-unit",
     "fromPin": "V+",
     "toNode": "node-core-mcu",
-    "toPin": "3V3",
+    "toPin": "VIN",
     "color": "#ef4444",
-    "label": "Power Rail"
+    "label": "Battery to VIN (check your board's input voltage range)"
   },
   {
     "id": "gen-w2",

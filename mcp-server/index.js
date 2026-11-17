@@ -19,9 +19,10 @@ import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const execAsync = promisify(exec);
-const WORKSPACE_ROOT = process.env.WORKSPACE_ROOT || '/workspaces/blueprint';
+const WORKSPACE_ROOT = path.resolve(process.env.WORKSPACE_ROOT || path.join(path.dirname(fileURLToPath(import.meta.url)), '..'));
 
 // Initialize MCP Server
 const server = new Server(
@@ -235,8 +236,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'execute_command': {
         const targetDir = args.cwd ? path.resolve(WORKSPACE_ROOT, args.cwd) : WORKSPACE_ROOT;
+        const relCwd = path.relative(WORKSPACE_ROOT, targetDir);
+        if (relCwd.startsWith('..') || path.isAbsolute(relCwd)) {
+          throw new Error('Access outside workspace root is not permitted.');
+        }
         const { stdout, stderr } = await execAsync(args.command, {
           cwd: targetDir,
+          timeout: 60000,
           maxBuffer: 10 * 1024 * 1024
         });
 
@@ -252,7 +258,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'read_workspace_file': {
         const targetPath = path.resolve(WORKSPACE_ROOT, args.path);
-        if (!targetPath.startsWith(WORKSPACE_ROOT)) {
+        if (path.relative(WORKSPACE_ROOT, targetPath).startsWith('..') || path.isAbsolute(path.relative(WORKSPACE_ROOT, targetPath))) {
           throw new Error('Access outside workspace root is not permitted.');
         }
         const data = fs.readFileSync(targetPath, 'utf8');
@@ -268,7 +274,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'write_workspace_file': {
         const targetPath = path.resolve(WORKSPACE_ROOT, args.path);
-        if (!targetPath.startsWith(WORKSPACE_ROOT)) {
+        if (path.relative(WORKSPACE_ROOT, targetPath).startsWith('..') || path.isAbsolute(path.relative(WORKSPACE_ROOT, targetPath))) {
           throw new Error('Access outside workspace root is not permitted.');
         }
         fs.mkdirSync(path.dirname(targetPath), { recursive: true });
@@ -285,7 +291,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'list_workspace_files': {
         const targetDir = args.directory ? path.resolve(WORKSPACE_ROOT, args.directory) : WORKSPACE_ROOT;
-        if (!targetDir.startsWith(WORKSPACE_ROOT)) {
+        if (path.relative(WORKSPACE_ROOT, targetDir).startsWith('..') || path.isAbsolute(path.relative(WORKSPACE_ROOT, targetDir))) {
           throw new Error('Access outside workspace root is not permitted.');
         }
         const entries = fs.readdirSync(targetDir, { withFileTypes: true });

@@ -9,18 +9,18 @@
 - **Core Microcontroller:** STM32F405 Flight Controller
 - **Power Budget:** 14.8V 4S 1500mAh LiPo Battery
 - **Dimensions:** 120 x 80 x 35 mm
-- **Weight:** 220 g
+- **Weight:** 350g
 
 ---
 
 ## 2. Bill of Materials (5 Components)
 | Component | SKU / Vendor | Qty | Unit Price |
 | :--- | :--- | :--- | :--- |
-| STM32F405 Flight Controller | STM32F405-FC-V3-ND (DigiKey) | 1 | $32.00 |
-| 14.8V 4S 1500mAh LiPo Battery | AF-BAT-2500 (Adafruit) | 1 | $14.50 |
-| Multisensor Breakout (I2C / SPI) | SEN-19096 (SparkFun) | 1 | $19.95 |
-| OLED / E-Ink Visual Display | WS-154-SPI (Waveshare) | 1 | $11.20 |
-| Parametric Protective Enclosure | CAD-GEN-ENCL-01 (Custom 3D Print / ForgeCAD) | 1 | $12.00 |
+| STM32F405 Flight Controller |  (DigiKey) | 1 | $32.00 |
+| 14.8V 4S 1500mAh LiPo Battery |  (Adafruit) | 1 | $14.50 |
+| Multisensor Breakout (I2C / SPI) |  (SparkFun) | 1 | $19.95 |
+| OLED / E-Ink Visual Display |  (Waveshare) | 1 | $11.20 |
+| Parametric Protective Enclosure |  (Custom 3D Print / ForgeCAD) | 1 | $12.00 |
 
 ---
 
