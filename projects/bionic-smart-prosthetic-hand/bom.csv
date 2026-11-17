@@ -1,0 +1,6 @@
+Part Name,Product SKU,Category,Vendor,Qty,Unit Price ($),Subtotal ($)
+"ESP32-S3 Dual-Core MCU","ESP32-S3-WROOM-1","electrical","DigiKey",1,8.50,8.50
+"3.7V 2500mAh LiPo Battery","High-Density Energy Storage Unit","electrical","Adafruit",1,14.50,14.50
+"Multisensor Breakout (I2C / SPI)","BME688 Air Quality & Environmental Sensor","electrical","SparkFun",1,19.95,19.95
+"OLED / E-Ink Visual Display","1.54-inch SPI High-Contrast Display","electrical","Waveshare",1,11.20,11.20
+"Parametric Protective Enclosure","Blueprint Gen-CAD Custom Enclosure (PETG)","3d_printed","Custom 3D Print / ForgeCAD",1,12.00,12.00

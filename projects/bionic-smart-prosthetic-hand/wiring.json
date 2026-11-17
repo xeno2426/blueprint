@@ -1,0 +1,74 @@
+[
+  {
+    "id": "gen-w1",
+    "fromNode": "node-power-unit",
+    "fromPin": "V+",
+    "toNode": "node-core-mcu",
+    "toPin": "3V3",
+    "color": "#ef4444",
+    "label": "Power Rail"
+  },
+  {
+    "id": "gen-w2",
+    "fromNode": "node-power-unit",
+    "fromPin": "GND",
+    "toNode": "node-core-mcu",
+    "toPin": "GND",
+    "color": "#1f2937",
+    "label": "Common Ground"
+  },
+  {
+    "id": "gen-w3",
+    "fromNode": "node-core-mcu",
+    "fromPin": "3V3",
+    "toNode": "node-primary-sensor",
+    "toPin": "VCC",
+    "color": "#f59e0b",
+    "label": "3.3V Sensor Power"
+  },
+  {
+    "id": "gen-w4",
+    "fromNode": "node-core-mcu",
+    "fromPin": "GND",
+    "toNode": "node-primary-sensor",
+    "toPin": "GND",
+    "color": "#1f2937",
+    "label": "GND"
+  },
+  {
+    "id": "gen-w5",
+    "fromNode": "node-core-mcu",
+    "fromPin": "SDA",
+    "toNode": "node-primary-sensor",
+    "toPin": "SDA",
+    "color": "#3b82f6",
+    "label": "I2C SDA"
+  },
+  {
+    "id": "gen-w6",
+    "fromNode": "node-core-mcu",
+    "fromPin": "SCL",
+    "toNode": "node-primary-sensor",
+    "toPin": "SCL",
+    "color": "#10b981",
+    "label": "I2C SCL"
+  },
+  {
+    "id": "gen-w7",
+    "fromNode": "node-core-mcu",
+    "fromPin": "3V3",
+    "toNode": "node-display-ui",
+    "toPin": "VCC",
+    "color": "#f59e0b",
+    "label": "3.3V Display Power"
+  },
+  {
+    "id": "gen-w8",
+    "fromNode": "node-core-mcu",
+    "fromPin": "GND",
+    "toNode": "node-display-ui",
+    "toPin": "GND",
+    "color": "#1f2937",
+    "label": "GND"
+  }
+]

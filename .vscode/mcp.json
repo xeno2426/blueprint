@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "blueprint-bridge": {
+      "command": "node",
+      "args": ["/workspaces/blueprint/mcp-server/index.js"],
+      "env": {
+        "WORKSPACE_ROOT": "/workspaces/blueprint"
+      }
+    }
+  }
+}
